@@ -13,7 +13,7 @@ pub fn draw(f: &mut Frame, app: &App) {
 
     match app.mode {
         InputMode::Help => draw_help(f, app, size),
-        InputMode::EditingPopup => {
+        InputMode::EditingPopup | InputMode::ViewingPopup => {
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
                 .constraints([Constraint::Min(1), Constraint::Length(3)].as_ref())
@@ -116,6 +116,7 @@ fn draw_status(f: &mut Frame, app: &App, area: Rect) {
         InputMode::Navigation => "Navigation",
         InputMode::Editing => "Editing",
         InputMode::EditingPopup => "Editing (Popup)",
+        InputMode::ViewingPopup => "Viewing (Popup)",
         InputMode::Help => "Help",
     };
 
@@ -170,15 +171,39 @@ fn draw_popup(f: &mut Frame, app: &App, area: Rect) {
     let popup_area = centered_rect(80, 60, area);
     f.render_widget(Clear, popup_area);
 
+    // Get task number for the title
+    let task_number = if app.cursor.row < app.entries.len() {
+        &app.entries[app.cursor.row].task_number
+    } else {
+        ""
+    };
+    let title = if task_number.is_empty() {
+        "Edit Time Entry".to_string()
+    } else {
+        format!("{} - Edit Time Entry", task_number)
+    };
+
     let block = Block::default()
-        .title("Edit Time Entry")
+        .title(title)
         .borders(Borders::ALL);
     let inner_area = block.inner(popup_area);
     f.render_widget(block, popup_area);
 
     if app.cursor.row < app.entries.len() {
         let text = app.entries[app.cursor.row].time_entry.clone();
-        let lines: Vec<Line> = text.lines().map(|l| Line::from(l)).collect();
+        
+        // Add cursor when in editing mode
+        let display_text = if matches!(app.mode, InputMode::EditingPopup) {
+            let mut chars: Vec<char> = text.chars().collect();
+            if app.text_cursor <= chars.len() {
+                chars.insert(app.text_cursor, '|');
+            }
+            chars.into_iter().collect::<String>()
+        } else {
+            text
+        };
+        
+        let lines: Vec<Line> = display_text.lines().map(|l| Line::from(l)).collect();
 
         let paragraph = Paragraph::new(lines)
             .scroll((app.popup_scroll as u16, 0))

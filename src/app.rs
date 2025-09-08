@@ -15,6 +15,7 @@ pub enum InputMode {
     Navigation,
     Editing,
     EditingPopup,
+    ViewingPopup,
     Help,
 }
 
@@ -134,13 +135,33 @@ impl App {
                 event::KeyCode::Backspace => self.delete_char(),
                 _ => {}
             },
+            InputMode::ViewingPopup => match key.code {
+                event::KeyCode::Char('i') => self.enter_edit(),
+                event::KeyCode::Tab => self.next_col(),
+                event::KeyCode::BackTab => self.prev_col(),
+                event::KeyCode::Up => {
+                    if self.popup_scroll > 0 {
+                        self.popup_scroll -= 1;
+                    }
+                }
+                event::KeyCode::Down => {
+                    self.popup_scroll += 1;
+                }
+                event::KeyCode::Left => self.prev_col(),
+                event::KeyCode::Right => self.next_col(),
+                _ => {}
+            },
             InputMode::EditingPopup => match key.code {
                 event::KeyCode::Esc => {
-                    self.mode = InputMode::Navigation;
-                    self.popup_scroll = 0;
+                    // Exit edit mode but stay in popup view
+                    self.mode = InputMode::ViewingPopup;
                 }
                 event::KeyCode::Tab => {
                     self.next_col();
+                    self.popup_scroll = 0;
+                }
+                event::KeyCode::BackTab => {
+                    self.prev_col();
                     self.popup_scroll = 0;
                 }
                 event::KeyCode::Enter => {
@@ -153,6 +174,21 @@ impl App {
                 }
                 event::KeyCode::Down => {
                     self.popup_scroll += 1;
+                }
+                event::KeyCode::Left => {
+                    if self.text_cursor > 0 {
+                        self.text_cursor -= 1;
+                    }
+                }
+                event::KeyCode::Right => {
+                    let max_len = self.get_current_field_length();
+                    if self.text_cursor < max_len {
+                        self.text_cursor += 1;
+                    }
+                }
+                event::KeyCode::Home => self.text_cursor = 0,
+                event::KeyCode::End => {
+                    self.text_cursor = self.get_current_field_length();
                 }
                 event::KeyCode::Char(c) => self.insert_char(c),
                 event::KeyCode::Backspace => self.delete_char(),
@@ -179,7 +215,11 @@ impl App {
         if self.cursor.col > 1 {
             self.cursor.col -= 1;
         } else {
+            // When on first column (Task Number), go to previous row's last column (End Time)
             self.cursor.col = 5;
+            if self.cursor.row > 0 {
+                self.cursor.row -= 1;
+            }
         }
         self.update_mode_for_column();
     }
@@ -202,10 +242,10 @@ impl App {
         // Auto-show popup when on Time Entry column (3), auto-hide when not
         if self.cursor.col == 3 {
             if matches!(self.mode, InputMode::Navigation) {
-                self.mode = InputMode::EditingPopup;
+                self.mode = InputMode::ViewingPopup;
             }
         } else {
-            if matches!(self.mode, InputMode::EditingPopup) {
+            if matches!(self.mode, InputMode::EditingPopup | InputMode::ViewingPopup) {
                 self.mode = InputMode::Navigation;
                 self.popup_scroll = 0;
             }
@@ -247,10 +287,17 @@ impl App {
     }
 
     fn enter_edit(&mut self) {
-        if self.cursor.col == 3 {
-            self.mode = InputMode::EditingPopup;
-        } else {
-            self.mode = InputMode::Editing;
+        match self.mode {
+            InputMode::ViewingPopup => {
+                self.mode = InputMode::EditingPopup;
+            }
+            _ => {
+                if self.cursor.col == 3 {
+                    self.mode = InputMode::EditingPopup;
+                } else {
+                    self.mode = InputMode::Editing;
+                }
+            }
         }
         // Update text cursor when entering edit mode
         self.update_text_cursor();
