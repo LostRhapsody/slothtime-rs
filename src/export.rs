@@ -1,5 +1,5 @@
 use anyhow::Result;
-use chrono::Local;
+use chrono::{Datelike, Local};
 use csv::Writer;
 use std::fs;
 use std::path::Path;
@@ -11,8 +11,11 @@ pub fn export_csv(entries: &[TimeEntry], config: &Config) -> Result<()> {
     let export_dir = shellexpand::tilde(&config.export.path).to_string();
     fs::create_dir_all(&export_dir)?;
 
-    let date = Local::now().date_naive();
-    let filename = format!("slothtime_{}.csv", date);
+    let now = Local::now();
+    let month = now.format("%B").to_string(); // Full month name (e.g., "September")
+    let day = now.day().to_string();          // Day without zero padding (e.g., "5")
+    let year = now.format("%Y").to_string();  // 4-digit year (e.g., "2025")
+    let filename = format!("{}_{}_{}_slothtime.csv", month, day, year);
     let filepath = Path::new(&export_dir).join(filename);
 
     let mut wtr = Writer::from_path(filepath)?;
