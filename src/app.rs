@@ -191,6 +191,9 @@ impl App {
             },
             InputMode::ViewingPopup => match key.code {
                 event::KeyCode::Char('i') => self.enter_edit(),
+                event::KeyCode::Char('y') if key.modifiers.contains(event::KeyModifiers::CONTROL) => {
+                    self.copy_current_field();
+                }
                 event::KeyCode::Tab => self.next_col(),
                 event::KeyCode::BackTab => self.prev_col(),
                 event::KeyCode::Up => {
@@ -217,6 +220,9 @@ impl App {
                 event::KeyCode::BackTab => {
                     self.prev_col();
                     self.popup_scroll = 0;
+                }
+                event::KeyCode::Char('y') if key.modifiers.contains(event::KeyModifiers::CONTROL) => {
+                    self.copy_current_field();
                 }
                 event::KeyCode::Enter => {
                     self.insert_char('\n');
