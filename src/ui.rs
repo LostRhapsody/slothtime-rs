@@ -68,9 +68,18 @@ fn draw_table(f: &mut Frame, app: &App, area: Rect) {
             // cell_data array is 0-indexed (0=row number, 1=Task Number, etc.)
             // So app.cursor.col should equal col_idx for the active cell
             if is_current_row && app.cursor.col == col_idx {
-                // Add brackets to make it obvious which cell is selected
-                let highlighted_content = format!("[{}]", content);
-                Text::styled(highlighted_content, active_cell_style)
+                // Add text cursor when in editing mode
+                let display_content = if matches!(app.mode, InputMode::Editing) {
+                    // Insert cursor indicator at text_cursor position
+                    let mut chars: Vec<char> = content.chars().collect();
+                    if app.text_cursor <= chars.len() {
+                        chars.insert(app.text_cursor, '|');
+                    }
+                    format!("[{}]", chars.into_iter().collect::<String>())
+                } else {
+                    format!("[{}]", content)
+                };
+                Text::styled(display_content, active_cell_style)
             } else {
                 Text::raw(content)
             }
