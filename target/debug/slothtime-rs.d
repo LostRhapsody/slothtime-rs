@@ -1,0 +1,1 @@
+/home/pscadmin/slothtime-rs/target/debug/slothtime-rs: /home/pscadmin/slothtime-rs/src/app.rs /home/pscadmin/slothtime-rs/src/config.rs /home/pscadmin/slothtime-rs/src/export.rs /home/pscadmin/slothtime-rs/src/main.rs /home/pscadmin/slothtime-rs/src/time_entry.rs /home/pscadmin/slothtime-rs/src/ui.rs

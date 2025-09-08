@@ -1,0 +1,7 @@
+[export]
+path = "~/Documents/slothtime_exports"
+format = "csv"
+
+[ui]
+show_instructions = true
+auto_save = true
