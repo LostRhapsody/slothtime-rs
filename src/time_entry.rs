@@ -29,6 +29,14 @@ impl TimeEntry {
             && !self.end_time.is_empty()
     }
 
+    pub fn is_entirely_empty(&self) -> bool {
+        self.task_number.is_empty()
+            && self.work_code.is_empty()
+            && self.time_entry.is_empty()
+            && self.start_time.is_empty()
+            && self.end_time.is_empty()
+    }
+
     pub fn calculate_task_time(&self) -> Option<String> {
         if self.start_time.is_empty() || self.end_time.is_empty() {
             return None;

@@ -31,7 +31,8 @@ pub fn export_csv(entries: &[TimeEntry], config: &Config) -> Result<()> {
     ])?;
 
     for (i, entry) in entries.iter().enumerate() {
-        if entry.is_complete() {
+        // Export all rows except entirely empty ones
+        if !entry.is_entirely_empty() {
             let task_time = entry
                 .calculate_task_time()
                 .unwrap_or_else(|| "00:00".to_string());
