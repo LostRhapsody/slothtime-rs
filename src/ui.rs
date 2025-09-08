@@ -1,7 +1,8 @@
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
-    widgets::{Block, Borders, Paragraph, Table, TableState, Wrap},
+    text::Line,
+    widgets::{Block, Borders, Clear, Paragraph, Table, TableState, Wrap},
     Frame,
 };
 
@@ -12,6 +13,16 @@ pub fn draw(f: &mut Frame, app: &App) {
 
     match app.mode {
         InputMode::Help => draw_help(f, app, size),
+        InputMode::EditingPopup => {
+            let chunks = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([Constraint::Min(1), Constraint::Length(3)].as_ref())
+                .split(size);
+
+            draw_table(f, app, chunks[0]);
+            draw_status(f, app, chunks[1]);
+            draw_popup(f, app, size);
+        }
         _ => {
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
@@ -33,10 +44,10 @@ fn draw_table(f: &mut Frame, app: &App, area: Rect) {
             row_num,
             entry.task_number.clone(),
             entry.work_code.clone(),
-            entry.time_entry.clone(),
+            entry.time_entry.replace("\n", " "),
             entry.start_time.clone(),
             entry.end_time.clone(),
-        ]).bottom_margin(0)
+        ]).bottom_margin(1)
     }).collect();
 
     let widths = [
@@ -67,6 +78,7 @@ fn draw_status(f: &mut Frame, app: &App, area: Rect) {
     let mode = match app.mode {
         InputMode::Navigation => "Navigation",
         InputMode::Editing => "Editing",
+        InputMode::EditingPopup => "Editing (Popup)",
         InputMode::Help => "Help",
     };
 
@@ -117,6 +129,47 @@ fn draw_status(f: &mut Frame, app: &App, area: Rect) {
     f.render_widget(paragraph, area);
 }
 
+fn draw_popup(f: &mut Frame, app: &App, area: Rect) {
+    let popup_area = centered_rect(80, 60, area);
+    f.render_widget(Clear, popup_area);
+
+    let block = Block::default()
+        .title("Edit Time Entry")
+        .borders(Borders::ALL);
+    let inner_area = block.inner(popup_area);
+    f.render_widget(block, popup_area);
+
+    if app.cursor.row < app.entries.len() {
+        let text = app.entries[app.cursor.row].time_entry.clone();
+        let lines: Vec<Line> = text.lines().map(|l| Line::from(l)).collect();
+
+        let paragraph = Paragraph::new(lines)
+            .scroll((app.popup_scroll as u16, 0))
+            .wrap(Wrap { trim: true });
+
+        f.render_widget(paragraph, inner_area);
+    }
+}
+
+fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
+    let popup_layout = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Percentage((100 - percent_y) / 2),
+            Constraint::Percentage(percent_y),
+            Constraint::Percentage((100 - percent_y) / 2),
+        ])
+        .split(r);
+
+    Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Percentage((100 - percent_x) / 2),
+            Constraint::Percentage(percent_x),
+            Constraint::Percentage((100 - percent_x) / 2),
+        ])
+        .split(popup_layout[1])[1]
+}
 fn draw_help(f: &mut Frame, _app: &App, area: Rect) {
     let help_text = r#"
 Slothtime TUI - Help

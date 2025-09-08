@@ -14,6 +14,7 @@ use serde_json;
 pub enum InputMode {
     Navigation,
     Editing,
+    EditingPopup,
     Help,
 }
 
@@ -35,6 +36,7 @@ pub struct App {
     pub mode: InputMode,
     pub config: Config,
     pub should_quit: bool,
+    pub popup_scroll: usize,
 }
 
 impl App {
@@ -47,6 +49,7 @@ impl App {
             mode: InputMode::Navigation,
             config,
             should_quit: false,
+            popup_scroll: 0,
         })
     }
 
@@ -88,6 +91,7 @@ impl App {
                 event::KeyCode::Char('x') if key.modifiers.contains(event::KeyModifiers::CONTROL) => {
                     self.clear_entries();
                 }
+
                 event::KeyCode::Char('i') => self.enter_edit(),
                 event::KeyCode::Char('?') => self.mode = InputMode::Help,
                 event::KeyCode::Tab => self.next_col(),
@@ -104,6 +108,30 @@ impl App {
                 event::KeyCode::Enter => {
                     self.next_row();
                     // stay in edit
+                }
+                event::KeyCode::Char(c) => self.insert_char(c),
+                event::KeyCode::Backspace => self.delete_char(),
+                _ => {}
+            },
+            InputMode::EditingPopup => match key.code {
+                event::KeyCode::Esc => {
+                    self.mode = InputMode::Navigation;
+                    self.popup_scroll = 0;
+                }
+                event::KeyCode::Tab => {
+                    self.next_col();
+                    self.popup_scroll = 0;
+                }
+                event::KeyCode::Enter => {
+                    self.insert_char('\n');
+                }
+                event::KeyCode::Up => {
+                    if self.popup_scroll > 0 {
+                        self.popup_scroll -= 1;
+                    }
+                }
+                event::KeyCode::Down => {
+                    self.popup_scroll += 1;
                 }
                 event::KeyCode::Char(c) => self.insert_char(c),
                 event::KeyCode::Backspace => self.delete_char(),
@@ -144,7 +172,11 @@ impl App {
     }
 
     fn enter_edit(&mut self) {
-        self.mode = InputMode::Editing;
+        if self.cursor.col == 3 {
+            self.mode = InputMode::EditingPopup;
+        } else {
+            self.mode = InputMode::Editing;
+        }
     }
 
     fn exit_edit(&mut self) {
@@ -195,4 +227,6 @@ impl App {
         self.cursor = Cursor::new();
         let _ = self.save_entries();
     }
+
+
 }

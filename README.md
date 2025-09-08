@@ -4,12 +4,13 @@ A Terminal User Interface (TUI) application for time tracking, built with Rust a
 
 ## Features
 
-- **Table-based Interface**: Navigate and edit time entries in a clean table format with row numbers and visual indicators
+- **Table-based Interface**: Navigate and edit time entries in a clean table format with row numbers, borders, and visual indicators
 - **Keyboard Navigation**: Vim-style navigation with Tab, arrow keys, and mode switching
 - **Data Persistence**: Automatic saving and loading of time entries between sessions
 - **Auto-Row Creation**: Automatically adds new rows when completing entries
 - **CSV Export**: Export your time entries to a configurable directory
 - **Help Menu**: Built-in help showing all keybinds
+- **Large Text Editing**: Floating popup for editing long time entries with scrolling
 - **Configurable Settings**: Customize export path and other options via `config.toml`
 
 ## Installation
@@ -62,6 +63,7 @@ Or if built:
 - **Enter**: Move to next row (stay in edit)
 - Type to insert characters
 - Backspace to delete characters
+- **Time Entry column**: Opens a large floating popup for multi-line editing
 
 ### Configuration
 
