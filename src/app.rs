@@ -1,8 +1,9 @@
 use std::io;
 use ratatui::Terminal;
 use ratatui::backend::CrosstermBackend;
-use crossterm::event;
+use crossterm::event::{self, KeyEventKind};
 use anyhow::Result;
+use arboard::Clipboard;
 
 use crate::time_entry::TimeEntry;
 use crate::config::Config;
@@ -42,6 +43,8 @@ pub struct App {
     pub popup_scroll: usize,
     pub text_cursor: usize, // Position within the current text field
     pub pending_delete: bool, // Track if first 'd' was pressed for 'dd' command
+    pub status_message: Option<String>, // Temporary status message
+    pub message_timer: Option<std::time::Instant>, // Timer for status message
 }
 
 impl App {
@@ -57,6 +60,8 @@ impl App {
             popup_scroll: 0,
             text_cursor: 0,
             pending_delete: false,
+            status_message: None,
+            message_timer: None,
         };
         // Initialize mode based on starting column
         app.update_mode_for_column();
@@ -77,6 +82,7 @@ impl App {
 
     pub fn run(&mut self, terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> Result<()> {
         loop {
+            self.update_message_timer();
             terminal.draw(|f| ui::draw(f, self))?;
             if self.should_quit {
                 self.save_entries().ok();
@@ -84,7 +90,11 @@ impl App {
             }
             if event::poll(std::time::Duration::from_millis(100))? {
                 if let event::Event::Key(key) = event::read()? {
-                    self.handle_key(key);
+                    // Only handle key press events, ignore key release events
+                    // This fixes double input on Windows
+                    if key.kind == KeyEventKind::Press {
+                        self.handle_key(key);
+                    }
                 }
             }
         }
@@ -100,6 +110,9 @@ impl App {
                 }
                 event::KeyCode::Char('x') if key.modifiers.contains(event::KeyModifiers::CONTROL) => {
                     self.mode = InputMode::ConfirmClearEntries;
+                }
+                event::KeyCode::Char('y') if key.modifiers.contains(event::KeyModifiers::CONTROL) => {
+                    self.copy_current_field();
                 }
                 event::KeyCode::Char('d') => {
                     if self.pending_delete {
@@ -540,6 +553,61 @@ impl App {
         self.cursor.col = 1;
         self.update_mode_for_column();
         let _ = self.save_entries();
+    }
+
+    fn show_message(&mut self, msg: &str) {
+        self.status_message = Some(msg.to_string());
+        self.message_timer = Some(std::time::Instant::now());
+    }
+
+    fn update_message_timer(&mut self) {
+        if let Some(timer) = self.message_timer {
+            if timer.elapsed().as_secs() >= 3 {
+                self.status_message = None;
+                self.message_timer = None;
+            }
+        }
+    }
+
+    fn copy_current_field(&mut self) {
+        if self.cursor.row >= self.entries.len() {
+            self.show_message("No entry to copy from");
+            return;
+        }
+
+        let entry = &self.entries[self.cursor.row];
+        let (field_content, field_name) = match self.cursor.col {
+            1 => (&entry.task_number, "Task Number"),
+            2 => (&entry.work_code, "Work Code"),
+            3 => (&entry.time_entry, "Time Entry"),
+            4 => (&entry.start_time, "Start Time"),
+            5 => (&entry.end_time, "End Time"),
+            _ => {
+                self.show_message("Invalid field");
+                return;
+            }
+        };
+
+        if field_content.is_empty() {
+            self.show_message(&format!("{} is empty", field_name));
+            return;
+        }
+
+        match Clipboard::new() {
+            Ok(mut clipboard) => {
+                match clipboard.set_text(field_content) {
+                    Ok(()) => {
+                        self.show_message(&format!("{} copied to clipboard!", field_name));
+                    }
+                    Err(_) => {
+                        self.show_message("Failed to copy to clipboard");
+                    }
+                }
+            }
+            Err(_) => {
+                self.show_message("Could not access clipboard");
+            }
+        }
     }
 
 }

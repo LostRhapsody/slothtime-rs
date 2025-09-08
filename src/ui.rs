@@ -88,8 +88,8 @@ fn draw_table(f: &mut Frame, app: &App, area: Rect) {
             // cell_data array is 0-indexed (0=row number, 1=Task Number, etc.)
             // So app.cursor.col should equal col_idx for the active cell
             if is_current_row && app.cursor.col == col_idx {
-                // Add text cursor when in editing mode
-                let display_content = if matches!(app.mode, InputMode::Editing) {
+                // Add text cursor when in editing mode, but NOT when popup is active
+                let display_content = if matches!(app.mode, InputMode::Editing) && !matches!(app.mode, InputMode::EditingPopup | InputMode::ViewingPopup) {
                     // Insert cursor indicator at text_cursor position
                     let mut chars: Vec<char> = content.chars().collect();
                     if app.text_cursor <= chars.len() {
@@ -165,7 +165,10 @@ fn draw_status(f: &mut Frame, app: &App, area: Rect) {
         "".to_string()
     };
 
-    let status = if matches!(app.mode, InputMode::Editing) {
+    let status = if let Some(ref message) = app.status_message {
+        // Show status message if available
+        message.clone()
+    } else if matches!(app.mode, InputMode::Editing) {
         format!(
             "Mode: {} | Editing {}: '{}' | Esc to exit, Tab to next cell",
             mode,
@@ -174,7 +177,7 @@ fn draw_status(f: &mut Frame, app: &App, area: Rect) {
         )
     } else {
         format!(
-            "Mode: {} | Row: {} | Col: {} ({}) | i to edit, Ctrl+S export, Ctrl+X clear, ? help | q quit",
+            "Mode: {} | Row: {} | Col: {} ({}) | i to edit, Ctrl+Y copy, Ctrl+S export, Ctrl+X clear, ? help | q quit",
             mode,
             app.cursor.row + 1,
             app.cursor.col,
@@ -265,6 +268,7 @@ Navigation Mode:
   Shift+Tab  - Move to previous column
   Arrow Keys - Navigate up/down/left/right
   ?          - Show this help
+  Ctrl+Y     - Copy current field to clipboard
   Ctrl+S     - Export to CSV
   Ctrl+X     - Clear all entries (with confirmation)
   q          - Quit
