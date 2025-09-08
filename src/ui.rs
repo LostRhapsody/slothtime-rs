@@ -1,7 +1,7 @@
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
-    text::Line,
+    text::{Line, Text},
     widgets::{Block, Borders, Clear, Paragraph, Table, TableState, Wrap},
     Frame,
 };
@@ -40,14 +40,43 @@ fn draw_table(f: &mut Frame, app: &App, area: Rect) {
 
     let rows: Vec<ratatui::widgets::Row> = app.entries.iter().enumerate().map(|(i, entry)| {
         let row_num = if i == app.cursor.row { ">>".to_string() } else { (i + 1).to_string() };
-        ratatui::widgets::Row::new(vec![
+        
+        let is_current_row = i == app.cursor.row;
+        let active_cell_style = match app.mode {
+            InputMode::Editing | InputMode::EditingPopup => Style::default()
+                .fg(Color::Black)
+                .bg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+            _ => Style::default()
+                .fg(Color::Black)
+                .bg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        };
+        
+        // Create cells with conditional styling
+        let cell_data = vec![
             row_num,
             entry.task_number.clone(),
             entry.work_code.clone(),
             entry.time_entry.replace("\n", " "),
             entry.start_time.clone(),
             entry.end_time.clone(),
-        ]).bottom_margin(1)
+        ];
+        
+        let cells: Vec<Text> = cell_data.into_iter().enumerate().map(|(col_idx, content)| {
+            // app.cursor.col is 1-indexed (1=Task Number, 2=Work Code, etc.)
+            // cell_data array is 0-indexed (0=row number, 1=Task Number, etc.)
+            // So app.cursor.col should equal col_idx for the active cell
+            if is_current_row && app.cursor.col == col_idx {
+                // Add brackets to make it obvious which cell is selected
+                let highlighted_content = format!("[{}]", content);
+                Text::styled(highlighted_content, active_cell_style)
+            } else {
+                Text::raw(content)
+            }
+        }).collect();
+        
+        ratatui::widgets::Row::new(cells).bottom_margin(1)
     }).collect();
 
     let widths = [
@@ -65,8 +94,7 @@ fn draw_table(f: &mut Frame, app: &App, area: Rect) {
                 .style(Style::default().fg(Color::Yellow))
                 .bottom_margin(1),
         )
-        .block(Block::default().borders(Borders::ALL).title("Slothtime"))
-        .highlight_style(Style::default().add_modifier(Modifier::REVERSED).fg(Color::Black).bg(Color::White));
+        .block(Block::default().borders(Borders::ALL).title("Slothtime"));
 
     let mut state = TableState::default();
     state.select(Some(app.cursor.row));
