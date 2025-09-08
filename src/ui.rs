@@ -23,6 +23,26 @@ pub fn draw(f: &mut Frame, app: &App) {
             draw_status(f, app, chunks[1]);
             draw_popup(f, app, size);
         }
+        InputMode::ConfirmDeleteEntry => {
+            let chunks = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([Constraint::Min(1), Constraint::Length(3)].as_ref())
+                .split(size);
+
+            draw_table(f, app, chunks[0]);
+            draw_status(f, app, chunks[1]);
+            draw_confirm_delete_dialog(f, app, size);
+        }
+        InputMode::ConfirmClearEntries => {
+            let chunks = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([Constraint::Min(1), Constraint::Length(3)].as_ref())
+                .split(size);
+
+            draw_table(f, app, chunks[0]);
+            draw_status(f, app, chunks[1]);
+            draw_confirm_clear_dialog(f, app, size);
+        }
         _ => {
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
@@ -118,6 +138,8 @@ fn draw_status(f: &mut Frame, app: &App, area: Rect) {
         InputMode::EditingPopup => "Editing (Popup)",
         InputMode::ViewingPopup => "Viewing (Popup)",
         InputMode::Help => "Help",
+        InputMode::ConfirmDeleteEntry => "Confirm Delete",
+        InputMode::ConfirmClearEntries => "Confirm Clear",
     };
 
     let col_name = match app.cursor.col {
@@ -238,12 +260,13 @@ Slothtime TUI - Help
 
 Navigation Mode:
   i          - Enter edit mode (vim-style)
+  dd         - Delete current entry (with confirmation)
   Tab        - Move to next column
   Shift+Tab  - Move to previous column
   Arrow Keys - Navigate up/down/left/right
   ?          - Show this help
   Ctrl+S     - Export to CSV
-  Ctrl+X     - Clear all entries
+  Ctrl+X     - Clear all entries (with confirmation)
   q          - Quit
 
 Edit Mode:
@@ -261,4 +284,56 @@ Press any key to return to navigation.
         .wrap(Wrap { trim: true });
 
     f.render_widget(paragraph, area);
+}
+
+fn draw_confirm_delete_dialog(f: &mut Frame, app: &App, area: Rect) {
+    let popup_area = centered_rect(50, 30, area);
+    f.render_widget(Clear, popup_area);
+
+    let task_info = if app.cursor.row < app.entries.len() {
+        let entry = &app.entries[app.cursor.row];
+        if entry.task_number.is_empty() {
+            format!("Row {}", app.cursor.row + 1)
+        } else {
+            format!("Entry: {}", entry.task_number)
+        }
+    } else {
+        "Entry".to_string()
+    };
+
+    let text = format!(
+        "Delete {}?\n\nPress 'y' to confirm, 'n' or Esc to cancel.",
+        task_info
+    );
+
+    let block = Block::default()
+        .title("Confirm Delete")
+        .borders(Borders::ALL)
+        .style(Style::default().fg(Color::Red));
+
+    let paragraph = Paragraph::new(text)
+        .block(block)
+        .wrap(Wrap { trim: true })
+        .alignment(ratatui::layout::Alignment::Center);
+
+    f.render_widget(paragraph, popup_area);
+}
+
+fn draw_confirm_clear_dialog(f: &mut Frame, _app: &App, area: Rect) {
+    let popup_area = centered_rect(50, 30, area);
+    f.render_widget(Clear, popup_area);
+
+    let text = "Clear all entries?\n\nThis will delete all time entries.\n\nPress 'y' to confirm, 'n' or Esc to cancel.";
+
+    let block = Block::default()
+        .title("Confirm Clear All")
+        .borders(Borders::ALL)
+        .style(Style::default().fg(Color::Red));
+
+    let paragraph = Paragraph::new(text)
+        .block(block)
+        .wrap(Wrap { trim: true })
+        .alignment(ratatui::layout::Alignment::Center);
+
+    f.render_widget(paragraph, popup_area);
 }

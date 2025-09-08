@@ -17,6 +17,8 @@ pub enum InputMode {
     EditingPopup,
     ViewingPopup,
     Help,
+    ConfirmDeleteEntry,
+    ConfirmClearEntries,
 }
 
 #[derive(Debug, Clone)]
@@ -39,6 +41,7 @@ pub struct App {
     pub should_quit: bool,
     pub popup_scroll: usize,
     pub text_cursor: usize, // Position within the current text field
+    pub pending_delete: bool, // Track if first 'd' was pressed for 'dd' command
 }
 
 impl App {
@@ -53,6 +56,7 @@ impl App {
             should_quit: false,
             popup_scroll: 0,
             text_cursor: 0,
+            pending_delete: false,
         };
         // Initialize mode based on starting column
         app.update_mode_for_column();
@@ -95,18 +99,55 @@ impl App {
                     let _ = self.export();
                 }
                 event::KeyCode::Char('x') if key.modifiers.contains(event::KeyModifiers::CONTROL) => {
-                    self.clear_entries();
+                    self.mode = InputMode::ConfirmClearEntries;
+                }
+                event::KeyCode::Char('d') => {
+                    if self.pending_delete {
+                        // Second 'd' - show confirmation
+                        self.mode = InputMode::ConfirmDeleteEntry;
+                        self.pending_delete = false;
+                    } else {
+                        // First 'd' - set pending
+                        self.pending_delete = true;
+                    }
                 }
 
-                event::KeyCode::Char('i') => self.enter_edit(),
-                event::KeyCode::Char('?') => self.mode = InputMode::Help,
-                event::KeyCode::Tab => self.next_col(),
-                event::KeyCode::BackTab => self.prev_col(),
-                event::KeyCode::Up => self.prev_row(),
-                event::KeyCode::Down => self.next_row(),
-                event::KeyCode::Left => self.prev_col(),
-                event::KeyCode::Right => self.next_col(),
-                _ => {}
+                event::KeyCode::Char('i') => {
+                    self.pending_delete = false;
+                    self.enter_edit();
+                }
+                event::KeyCode::Char('?') => {
+                    self.pending_delete = false;
+                    self.mode = InputMode::Help;
+                }
+                event::KeyCode::Tab => {
+                    self.pending_delete = false;
+                    self.next_col();
+                }
+                event::KeyCode::BackTab => {
+                    self.pending_delete = false;
+                    self.prev_col();
+                }
+                event::KeyCode::Up => {
+                    self.pending_delete = false;
+                    self.prev_row();
+                }
+                event::KeyCode::Down => {
+                    self.pending_delete = false;
+                    self.next_row();
+                }
+                event::KeyCode::Left => {
+                    self.pending_delete = false;
+                    self.prev_col();
+                }
+                event::KeyCode::Right => {
+                    self.pending_delete = false;
+                    self.next_col();
+                }
+                _ => {
+                    // Reset pending delete on any other key
+                    self.pending_delete = false;
+                }
             },
             InputMode::Editing => match key.code {
                 event::KeyCode::Esc => self.exit_edit(),
@@ -168,12 +209,10 @@ impl App {
                     self.insert_char('\n');
                 }
                 event::KeyCode::Up => {
-                    if self.popup_scroll > 0 {
-                        self.popup_scroll -= 1;
-                    }
+                    self.move_cursor_up_in_text();
                 }
                 event::KeyCode::Down => {
-                    self.popup_scroll += 1;
+                    self.move_cursor_down_in_text();
                 }
                 event::KeyCode::Left => {
                     if self.text_cursor > 0 {
@@ -197,6 +236,26 @@ impl App {
             InputMode::Help => {
                 self.mode = InputMode::Navigation;
             }
+            InputMode::ConfirmDeleteEntry => match key.code {
+                event::KeyCode::Char('y') | event::KeyCode::Char('Y') => {
+                    self.delete_current_entry();
+                    self.mode = InputMode::Navigation;
+                }
+                event::KeyCode::Char('n') | event::KeyCode::Char('N') | event::KeyCode::Esc => {
+                    self.mode = InputMode::Navigation;
+                }
+                _ => {}
+            },
+            InputMode::ConfirmClearEntries => match key.code {
+                event::KeyCode::Char('y') | event::KeyCode::Char('Y') => {
+                    self.clear_entries();
+                    self.mode = InputMode::Navigation;
+                }
+                event::KeyCode::Char('n') | event::KeyCode::Char('N') | event::KeyCode::Esc => {
+                    self.mode = InputMode::Navigation;
+                }
+                _ => {}
+            },
         }
     }
 
@@ -227,6 +286,12 @@ impl App {
     fn next_row(&mut self) {
         if self.cursor.row < self.entries.len() - 1 {
             self.cursor.row += 1;
+        } else {
+            // Auto-create new row if at the end and current row is complete
+            if self.entries[self.cursor.row].is_complete() {
+                self.entries.push(TimeEntry::new());
+                self.cursor.row += 1;
+            }
         }
         self.update_mode_for_column();
     }
@@ -241,14 +306,20 @@ impl App {
     fn update_mode_for_column(&mut self) {
         // Auto-show popup when on Time Entry column (3), auto-hide when not
         if self.cursor.col == 3 {
-            if matches!(self.mode, InputMode::Navigation) {
-                self.mode = InputMode::ViewingPopup;
+            // Convert to popup mode while preserving edit state
+            match self.mode {
+                InputMode::Navigation => self.mode = InputMode::ViewingPopup,
+                InputMode::Editing => self.mode = InputMode::EditingPopup,
+                _ => {} // Already in popup mode or other mode
             }
         } else {
-            if matches!(self.mode, InputMode::EditingPopup | InputMode::ViewingPopup) {
-                self.mode = InputMode::Navigation;
-                self.popup_scroll = 0;
+            // Convert back to regular mode while preserving edit state
+            match self.mode {
+                InputMode::ViewingPopup => self.mode = InputMode::Navigation,
+                InputMode::EditingPopup => self.mode = InputMode::Editing,
+                _ => {} // Already in regular mode or other mode
             }
+            self.popup_scroll = 0;
         }
         // Update text cursor position when switching cells
         self.update_text_cursor();
@@ -285,6 +356,92 @@ impl App {
             0
         }
     }
+    
+    fn move_cursor_up_in_text(&mut self) {
+        if self.cursor.col != 3 || self.cursor.row >= self.entries.len() {
+            return;
+        }
+        
+        let text = self.entries[self.cursor.row].time_entry.clone();
+        let lines: Vec<&str> = text.lines().collect();
+        
+        if lines.is_empty() {
+            return;
+        }
+        
+        // Find current line and position within that line
+        let mut char_count = 0;
+        let mut current_line = 0;
+        let mut pos_in_line = 0;
+        
+        for (line_idx, line) in lines.iter().enumerate() {
+            if char_count + line.len() >= self.text_cursor {
+                current_line = line_idx;
+                pos_in_line = self.text_cursor - char_count;
+                break;
+            }
+            char_count += line.len() + 1; // +1 for newline
+        }
+        
+        // Move to previous line if possible
+        if current_line > 0 {
+            let prev_line = lines[current_line - 1];
+            let new_pos_in_line = pos_in_line.min(prev_line.len());
+            
+            // Calculate new cursor position
+            let mut new_cursor = 0;
+            for i in 0..(current_line - 1) {
+                new_cursor += lines[i].len() + 1;
+            }
+            new_cursor += new_pos_in_line;
+            
+            self.text_cursor = new_cursor;
+        }
+    }
+    
+    fn move_cursor_down_in_text(&mut self) {
+        if self.cursor.col != 3 || self.cursor.row >= self.entries.len() {
+            return;
+        }
+        
+        let text = self.entries[self.cursor.row].time_entry.clone();
+        let lines: Vec<&str> = text.lines().collect();
+        
+        if lines.is_empty() {
+            return;
+        }
+        
+        // Find current line and position within that line
+        let mut char_count = 0;
+        let mut current_line = 0;
+        let mut pos_in_line = 0;
+        
+        for (line_idx, line) in lines.iter().enumerate() {
+            if char_count + line.len() >= self.text_cursor {
+                current_line = line_idx;
+                pos_in_line = self.text_cursor - char_count;
+                break;
+            }
+            char_count += line.len() + 1; // +1 for newline
+        }
+        
+        // Move to next line if possible
+        if current_line < lines.len() - 1 {
+            let next_line = lines[current_line + 1];
+            let new_pos_in_line = pos_in_line.min(next_line.len());
+            
+            // Calculate new cursor position
+            let mut new_cursor = 0;
+            for i in 0..=current_line {
+                new_cursor += lines[i].len() + 1;
+            }
+            new_cursor += new_pos_in_line;
+            
+            self.text_cursor = new_cursor;
+        }
+        // Note: Removed auto-scroll call to avoid borrow issues for now
+    }
+    
 
     fn enter_edit(&mut self) {
         match self.mode {
@@ -364,5 +521,25 @@ impl App {
         let _ = self.save_entries();
     }
 
+    fn delete_current_entry(&mut self) {
+        if self.entries.len() <= 1 {
+            // Don't delete the last entry, just clear it
+            self.entries[0] = TimeEntry::new();
+            self.cursor = Cursor::new();
+        } else {
+            // Remove current entry
+            self.entries.remove(self.cursor.row);
+            
+            // Adjust cursor position if needed
+            if self.cursor.row >= self.entries.len() {
+                self.cursor.row = self.entries.len() - 1;
+            }
+        }
+        
+        // Reset cursor column and update mode
+        self.cursor.col = 1;
+        self.update_mode_for_column();
+        let _ = self.save_entries();
+    }
 
 }
