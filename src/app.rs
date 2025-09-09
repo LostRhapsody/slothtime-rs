@@ -1,15 +1,15 @@
-use std::io;
-use ratatui::Terminal;
-use ratatui::backend::CrosstermBackend;
-use crossterm::event::{self, KeyEventKind};
 use anyhow::Result;
 use arboard::Clipboard;
+use crossterm::event::{self, KeyEventKind};
+use ratatui::backend::CrosstermBackend;
+use ratatui::Terminal;
+use std::io;
 
-use crate::time_entry::TimeEntry;
 use crate::config::Config;
+use crate::time_entry::TimeEntry;
 use crate::ui;
-use std::fs;
 use serde_json;
+use std::fs;
 
 #[derive(Debug, Clone)]
 pub enum InputMode {
@@ -41,7 +41,7 @@ pub struct App {
     pub config: Config,
     pub should_quit: bool,
     pub popup_scroll: usize,
-    pub text_cursor: usize, // Position within the current text field
+    pub text_cursor: usize,   // Position within the current text field
     pub pending_delete: bool, // Track if first 'd' was pressed for 'dd' command
     pub status_message: Option<String>, // Temporary status message
     pub message_timer: Option<std::time::Instant>, // Timer for status message
@@ -69,14 +69,28 @@ impl App {
     }
 
     fn load_entries() -> Result<Vec<TimeEntry>> {
-        let content = fs::read_to_string("entries.json")?;
+        // Get home dir/ location for entries file
+        let home_dir = dirs::home_dir().unwrap();
+        let config_dir = home_dir.join(".slothtime");
+        if !config_dir.exists() {
+            fs::create_dir_all(&config_dir).unwrap();
+        }
+        let file = config_dir.join("entries.json");
+        let content = fs::read_to_string(file)?;
         let entries: Vec<TimeEntry> = serde_json::from_str(&content)?;
         Ok(entries)
     }
 
     fn save_entries(&self) -> Result<()> {
         let content = serde_json::to_string(&self.entries)?;
-        fs::write("entries.json", content)?;
+        // Get home dir/ location for entries file
+        let home_dir = dirs::home_dir().unwrap();
+        let config_dir = home_dir.join(".slothtime");
+        if !config_dir.exists() {
+            fs::create_dir_all(&config_dir).unwrap();
+        }
+        let file = config_dir.join("entries.json");
+        fs::write(file, content)?;
         Ok(())
     }
 
@@ -105,13 +119,19 @@ impl App {
         match self.mode {
             InputMode::Navigation => match key.code {
                 event::KeyCode::Char('q') => self.should_quit = true,
-                event::KeyCode::Char('s') if key.modifiers.contains(event::KeyModifiers::CONTROL) => {
+                event::KeyCode::Char('s')
+                    if key.modifiers.contains(event::KeyModifiers::CONTROL) =>
+                {
                     let _ = self.export();
                 }
-                event::KeyCode::Char('x') if key.modifiers.contains(event::KeyModifiers::CONTROL) => {
+                event::KeyCode::Char('x')
+                    if key.modifiers.contains(event::KeyModifiers::CONTROL) =>
+                {
                     self.mode = InputMode::ConfirmClearEntries;
                 }
-                event::KeyCode::Char('y') if key.modifiers.contains(event::KeyModifiers::CONTROL) => {
+                event::KeyCode::Char('y')
+                    if key.modifiers.contains(event::KeyModifiers::CONTROL) =>
+                {
                     self.copy_current_field();
                 }
                 event::KeyCode::Char('d') => {
@@ -191,7 +211,9 @@ impl App {
             },
             InputMode::ViewingPopup => match key.code {
                 event::KeyCode::Char('i') => self.enter_edit(),
-                event::KeyCode::Char('y') if key.modifiers.contains(event::KeyModifiers::CONTROL) => {
+                event::KeyCode::Char('y')
+                    if key.modifiers.contains(event::KeyModifiers::CONTROL) =>
+                {
                     self.copy_current_field();
                 }
                 event::KeyCode::Tab => self.next_col(),
@@ -221,7 +243,9 @@ impl App {
                     self.prev_col();
                     self.popup_scroll = 0;
                 }
-                event::KeyCode::Char('y') if key.modifiers.contains(event::KeyModifiers::CONTROL) => {
+                event::KeyCode::Char('y')
+                    if key.modifiers.contains(event::KeyModifiers::CONTROL) =>
+                {
                     self.copy_current_field();
                 }
                 event::KeyCode::Enter => {
@@ -343,7 +367,7 @@ impl App {
         // Update text cursor position when switching cells
         self.update_text_cursor();
     }
-    
+
     fn update_text_cursor(&mut self) {
         // Set text cursor to end of current field
         if self.cursor.row < self.entries.len() {
@@ -359,7 +383,7 @@ impl App {
             self.text_cursor = text_length;
         }
     }
-    
+
     fn get_current_field_length(&self) -> usize {
         if self.cursor.row < self.entries.len() {
             let entry = &self.entries[self.cursor.row];
@@ -375,24 +399,24 @@ impl App {
             0
         }
     }
-    
+
     fn move_cursor_up_in_text(&mut self) {
         if self.cursor.col != 3 || self.cursor.row >= self.entries.len() {
             return;
         }
-        
+
         let text = self.entries[self.cursor.row].time_entry.clone();
         let lines: Vec<&str> = text.lines().collect();
-        
+
         if lines.is_empty() {
             return;
         }
-        
+
         // Find current line and position within that line
         let mut char_count = 0;
         let mut current_line = 0;
         let mut pos_in_line = 0;
-        
+
         for (line_idx, line) in lines.iter().enumerate() {
             if char_count + line.len() >= self.text_cursor {
                 current_line = line_idx;
@@ -401,40 +425,40 @@ impl App {
             }
             char_count += line.len() + 1; // +1 for newline
         }
-        
+
         // Move to previous line if possible
         if current_line > 0 {
             let prev_line = lines[current_line - 1];
             let new_pos_in_line = pos_in_line.min(prev_line.len());
-            
+
             // Calculate new cursor position
             let mut new_cursor = 0;
             for i in 0..(current_line - 1) {
                 new_cursor += lines[i].len() + 1;
             }
             new_cursor += new_pos_in_line;
-            
+
             self.text_cursor = new_cursor;
         }
     }
-    
+
     fn move_cursor_down_in_text(&mut self) {
         if self.cursor.col != 3 || self.cursor.row >= self.entries.len() {
             return;
         }
-        
+
         let text = self.entries[self.cursor.row].time_entry.clone();
         let lines: Vec<&str> = text.lines().collect();
-        
+
         if lines.is_empty() {
             return;
         }
-        
+
         // Find current line and position within that line
         let mut char_count = 0;
         let mut current_line = 0;
         let mut pos_in_line = 0;
-        
+
         for (line_idx, line) in lines.iter().enumerate() {
             if char_count + line.len() >= self.text_cursor {
                 current_line = line_idx;
@@ -443,24 +467,23 @@ impl App {
             }
             char_count += line.len() + 1; // +1 for newline
         }
-        
+
         // Move to next line if possible
         if current_line < lines.len() - 1 {
             let next_line = lines[current_line + 1];
             let new_pos_in_line = pos_in_line.min(next_line.len());
-            
+
             // Calculate new cursor position
             let mut new_cursor = 0;
             for i in 0..=current_line {
                 new_cursor += lines[i].len() + 1;
             }
             new_cursor += new_pos_in_line;
-            
+
             self.text_cursor = new_cursor;
         }
         // Note: Removed auto-scroll call to avoid borrow issues for now
     }
-    
 
     fn enter_edit(&mut self) {
         match self.mode {
@@ -482,7 +505,8 @@ impl App {
     fn exit_edit(&mut self) {
         self.mode = InputMode::Navigation;
         // auto-create new row if last and complete
-        if self.cursor.row == self.entries.len() - 1 && self.entries[self.cursor.row].is_complete() {
+        if self.cursor.row == self.entries.len() - 1 && self.entries[self.cursor.row].is_complete()
+        {
             self.entries.push(TimeEntry::new());
         }
     }
@@ -500,7 +524,7 @@ impl App {
             5 => &mut entry.end_time,
             _ => return,
         };
-        
+
         // Insert character at cursor position
         if self.text_cursor <= field.len() {
             field.insert(self.text_cursor, c);
@@ -521,7 +545,7 @@ impl App {
             5 => &mut entry.end_time,
             _ => return,
         };
-        
+
         // Delete character before cursor position
         if self.text_cursor > 0 && self.text_cursor <= field.len() {
             field.remove(self.text_cursor - 1);
@@ -548,13 +572,13 @@ impl App {
         } else {
             // Remove current entry
             self.entries.remove(self.cursor.row);
-            
+
             // Adjust cursor position if needed
             if self.cursor.row >= self.entries.len() {
                 self.cursor.row = self.entries.len() - 1;
             }
         }
-        
+
         // Reset cursor column and update mode
         self.cursor.col = 1;
         self.update_mode_for_column();
@@ -600,20 +624,17 @@ impl App {
         }
 
         match Clipboard::new() {
-            Ok(mut clipboard) => {
-                match clipboard.set_text(field_content) {
-                    Ok(()) => {
-                        self.show_message(&format!("{} copied to clipboard!", field_name));
-                    }
-                    Err(_) => {
-                        self.show_message("Failed to copy to clipboard");
-                    }
+            Ok(mut clipboard) => match clipboard.set_text(field_content) {
+                Ok(()) => {
+                    self.show_message(&format!("{} copied to clipboard!", field_name));
                 }
-            }
+                Err(_) => {
+                    self.show_message("Failed to copy to clipboard");
+                }
+            },
             Err(_) => {
                 self.show_message("Could not access clipboard");
             }
         }
     }
-
 }

@@ -1,10 +1,11 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::Path;
+use std::path::PathBuf;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
+    pub file: PathBuf,
     pub export: Export,
     pub ui: Ui,
 }
@@ -23,6 +24,13 @@ pub struct Ui {
 
 impl Default for Config {
     fn default() -> Self {
+        // Get home dir/ location for config
+        let home_dir = dirs::home_dir().unwrap();
+        let config_dir = home_dir.join(".slothtime");
+        if !config_dir.exists() {
+            fs::create_dir_all(&config_dir).unwrap();
+        }
+        let file = config_dir.join("slothtime.toml");
         let export = Export {
             path: "~/Documents/slothtime_exports".to_string(),
             format: "csv".to_string(),
@@ -31,19 +39,18 @@ impl Default for Config {
             show_instructions: true,
             auto_save: true,
         };
-        Self { export, ui }
+        Self { file, export, ui }
     }
 }
 
 impl Config {
     pub fn load() -> Result<Self> {
-        let config_path = "config.toml";
-        if Path::new(config_path).exists() {
-            let content = fs::read_to_string(config_path)?;
+        let config = Self::default();
+        if config.file.exists() {
+            let content = fs::read_to_string(config.file)?;
             let config: Config = toml::from_str(&content)?;
             Ok(config)
         } else {
-            let config = Self::default();
             config.save()?;
             Ok(config)
         }
@@ -51,7 +58,7 @@ impl Config {
 
     pub fn save(&self) -> Result<()> {
         let content = toml::to_string(self)?;
-        fs::write("config.toml", content)?;
+        fs::write(self.file.clone(), content)?;
         Ok(())
     }
 }
