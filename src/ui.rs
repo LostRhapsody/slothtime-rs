@@ -1,10 +1,11 @@
 use ratatui::{
-    layout::{Constraint, Direction, Layout, Rect},
+    layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Text},
     widgets::{Block, Borders, Clear, Paragraph, Table, TableState, Wrap},
     Frame,
 };
+use chrono::Local;
 
 use crate::app::{App, InputMode};
 
@@ -12,45 +13,92 @@ pub fn draw(f: &mut Frame, app: &App) {
     let size = f.size();
 
     match app.mode {
-        InputMode::Help => draw_help(f, app, size),
-        InputMode::EditingPopup | InputMode::ViewingPopup => {
+        InputMode::Help => {
+            let constraints = if app.config.ui.time_bar.show {
+                [Constraint::Min(1), Constraint::Length(1)].as_ref()
+            } else {
+                [Constraint::Min(1)].as_ref()
+            };
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
-                .constraints([Constraint::Min(1), Constraint::Length(3)].as_ref())
+                .constraints(constraints)
+                .split(size);
+
+            draw_help(f, app, chunks[0]);
+            if app.config.ui.time_bar.show {
+                draw_time_bar(f, app, chunks[1]);
+            }
+        }
+        InputMode::EditingPopup | InputMode::ViewingPopup => {
+            let constraints = if app.config.ui.time_bar.show {
+                [Constraint::Min(1), Constraint::Length(3), Constraint::Length(1)].as_ref()
+            } else {
+                [Constraint::Min(1), Constraint::Length(3)].as_ref()
+            };
+            let chunks = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints(constraints)
                 .split(size);
 
             draw_table(f, app, chunks[0]);
             draw_status(f, app, chunks[1]);
+            if app.config.ui.time_bar.show {
+                draw_time_bar(f, app, chunks[2]);
+            }
             draw_popup(f, app, size);
         }
         InputMode::ConfirmDeleteEntry => {
+            let constraints = if app.config.ui.time_bar.show {
+                [Constraint::Min(1), Constraint::Length(3), Constraint::Length(1)].as_ref()
+            } else {
+                [Constraint::Min(1), Constraint::Length(3)].as_ref()
+            };
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
-                .constraints([Constraint::Min(1), Constraint::Length(3)].as_ref())
+                .constraints(constraints)
                 .split(size);
 
             draw_table(f, app, chunks[0]);
             draw_status(f, app, chunks[1]);
+            if app.config.ui.time_bar.show {
+                draw_time_bar(f, app, chunks[2]);
+            }
             draw_confirm_delete_dialog(f, app, size);
         }
         InputMode::ConfirmClearEntries => {
+            let constraints = if app.config.ui.time_bar.show {
+                [Constraint::Min(1), Constraint::Length(3), Constraint::Length(1)].as_ref()
+            } else {
+                [Constraint::Min(1), Constraint::Length(3)].as_ref()
+            };
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
-                .constraints([Constraint::Min(1), Constraint::Length(3)].as_ref())
+                .constraints(constraints)
                 .split(size);
 
             draw_table(f, app, chunks[0]);
             draw_status(f, app, chunks[1]);
+            if app.config.ui.time_bar.show {
+                draw_time_bar(f, app, chunks[2]);
+            }
             draw_confirm_clear_dialog(f, app, size);
         }
         _ => {
+            let constraints = if app.config.ui.time_bar.show {
+                [Constraint::Min(1), Constraint::Length(3), Constraint::Length(1)].as_ref()
+            } else {
+                [Constraint::Min(1), Constraint::Length(3)].as_ref()
+            };
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
-                .constraints([Constraint::Min(1), Constraint::Length(3)].as_ref())
+                .constraints(constraints)
                 .split(size);
 
             draw_table(f, app, chunks[0]);
             draw_status(f, app, chunks[1]);
+            if app.config.ui.time_bar.show {
+                draw_time_bar(f, app, chunks[2]);
+            }
         }
     }
 }
@@ -340,4 +388,28 @@ fn draw_confirm_clear_dialog(f: &mut Frame, _app: &App, area: Rect) {
         .alignment(ratatui::layout::Alignment::Center);
 
     f.render_widget(paragraph, popup_area);
+}
+
+fn draw_time_bar(f: &mut Frame, app: &App, area: Rect) {
+    let now = Local::now();
+    
+    let time_text = if app.config.ui.time_bar.format_24hr {
+        if app.config.ui.time_bar.show_date {
+            format!("{} | {}", now.format("%H:%M:%S"), now.format("%d"))
+        } else {
+            format!("{}", now.format("%H:%M:%S"))
+        }
+    } else {
+        if app.config.ui.time_bar.show_date {
+            format!("{} | {}", now.format("%I:%M:%S %p"), now.format("%d"))
+        } else {
+            format!("{}", now.format("%I:%M:%S %p"))
+        }
+    };
+
+    let paragraph = Paragraph::new(time_text)
+        .style(Style::default().fg(Color::Gray))
+        .alignment(Alignment::Center);
+
+    f.render_widget(paragraph, area);
 }

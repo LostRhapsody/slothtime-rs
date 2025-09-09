@@ -20,6 +20,14 @@ pub struct Export {
 pub struct Ui {
     pub show_instructions: bool,
     pub auto_save: bool,
+    pub time_bar: TimeBar,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TimeBar {
+    pub show: bool,
+    pub format_24hr: bool,
+    pub show_date: bool,
 }
 
 impl Default for Config {
@@ -38,6 +46,11 @@ impl Default for Config {
         let ui = Ui {
             show_instructions: true,
             auto_save: true,
+            time_bar: TimeBar {
+                show: true,
+                format_24hr: false,
+                show_date: false,
+            },
         };
         Self { file, export, ui }
     }

@@ -41,9 +41,19 @@ Or if built:
 
 Type "?" to see a list of shortcuts and instructions.
 
+## TODO
+
+A few quality of life improvements.
+
+- [] All text fields: Enhance the appeal of typing. Improve the cursor, include undo/redo operations, more vim motions.
+- [] Time entry text field: Enhance the behavior, currently can't scroll past the default size, so you can type as much as you want, but can't see it after 50 lines or so. Need's to have overflow behavior.
+- [] Save/Export notification: Add a message to the status bar when saving/export.
+- [] Auto save: When turned on, after exiting edit mode, automatically export the file.
+- [] Themes: add some color
+
 ### Configuration
 
-The app creates a `config.toml` file in the current directory on first run. You can modify it to change settings:
+a `slothtime.toml` file is created in the default configuration directory, `~/.slothtime`. It contains the following:
 
 ```toml
 [export]
@@ -54,6 +64,13 @@ format = "csv"
 show_instructions = true
 auto_save = true
 ```
+
+- export: Fields for the exporting functionality
+    - path: where the exported files will be
+    - format: format of the exported files. Only CSV is supported at the moment.
+- ui: Fields for altering UI behavior
+    - show_instructions: not implemented
+    - auto_save: not implemented
 
 ## Export Format
 
