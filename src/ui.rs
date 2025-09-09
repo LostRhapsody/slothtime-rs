@@ -15,7 +15,7 @@ pub fn draw(f: &mut Frame, app: &App) {
     match app.mode {
         InputMode::Help => {
             let constraints = if app.config.ui.time_bar.show {
-                [Constraint::Min(1), Constraint::Length(1)].as_ref()
+                [Constraint::Length(1), Constraint::Min(1)].as_ref()
             } else {
                 [Constraint::Min(1)].as_ref()
             };
@@ -24,14 +24,16 @@ pub fn draw(f: &mut Frame, app: &App) {
                 .constraints(constraints)
                 .split(size);
 
-            draw_help(f, app, chunks[0]);
             if app.config.ui.time_bar.show {
-                draw_time_bar(f, app, chunks[1]);
+                draw_time_bar(f, app, chunks[0]);
+                draw_help(f, app, chunks[1]);
+            } else {
+                draw_help(f, app, chunks[0]);
             }
         }
         InputMode::EditingPopup | InputMode::ViewingPopup => {
             let constraints = if app.config.ui.time_bar.show {
-                [Constraint::Min(1), Constraint::Length(3), Constraint::Length(1)].as_ref()
+                [Constraint::Length(1), Constraint::Min(1), Constraint::Length(3)].as_ref()
             } else {
                 [Constraint::Min(1), Constraint::Length(3)].as_ref()
             };
@@ -40,16 +42,19 @@ pub fn draw(f: &mut Frame, app: &App) {
                 .constraints(constraints)
                 .split(size);
 
-            draw_table(f, app, chunks[0]);
-            draw_status(f, app, chunks[1]);
             if app.config.ui.time_bar.show {
-                draw_time_bar(f, app, chunks[2]);
+                draw_time_bar(f, app, chunks[0]);
+                draw_table(f, app, chunks[1]);
+                draw_status(f, app, chunks[2]);
+            } else {
+                draw_table(f, app, chunks[0]);
+                draw_status(f, app, chunks[1]);
             }
             draw_popup(f, app, size);
         }
         InputMode::ConfirmDeleteEntry => {
             let constraints = if app.config.ui.time_bar.show {
-                [Constraint::Min(1), Constraint::Length(3), Constraint::Length(1)].as_ref()
+                [Constraint::Length(1), Constraint::Min(1), Constraint::Length(3)].as_ref()
             } else {
                 [Constraint::Min(1), Constraint::Length(3)].as_ref()
             };
@@ -58,16 +63,19 @@ pub fn draw(f: &mut Frame, app: &App) {
                 .constraints(constraints)
                 .split(size);
 
-            draw_table(f, app, chunks[0]);
-            draw_status(f, app, chunks[1]);
             if app.config.ui.time_bar.show {
-                draw_time_bar(f, app, chunks[2]);
+                draw_time_bar(f, app, chunks[0]);
+                draw_table(f, app, chunks[1]);
+                draw_status(f, app, chunks[2]);
+            } else {
+                draw_table(f, app, chunks[0]);
+                draw_status(f, app, chunks[1]);
             }
             draw_confirm_delete_dialog(f, app, size);
         }
         InputMode::ConfirmClearEntries => {
             let constraints = if app.config.ui.time_bar.show {
-                [Constraint::Min(1), Constraint::Length(3), Constraint::Length(1)].as_ref()
+                [Constraint::Length(1), Constraint::Min(1), Constraint::Length(3)].as_ref()
             } else {
                 [Constraint::Min(1), Constraint::Length(3)].as_ref()
             };
@@ -76,16 +84,19 @@ pub fn draw(f: &mut Frame, app: &App) {
                 .constraints(constraints)
                 .split(size);
 
-            draw_table(f, app, chunks[0]);
-            draw_status(f, app, chunks[1]);
             if app.config.ui.time_bar.show {
-                draw_time_bar(f, app, chunks[2]);
+                draw_time_bar(f, app, chunks[0]);
+                draw_table(f, app, chunks[1]);
+                draw_status(f, app, chunks[2]);
+            } else {
+                draw_table(f, app, chunks[0]);
+                draw_status(f, app, chunks[1]);
             }
             draw_confirm_clear_dialog(f, app, size);
         }
         _ => {
             let constraints = if app.config.ui.time_bar.show {
-                [Constraint::Min(1), Constraint::Length(3), Constraint::Length(1)].as_ref()
+                [Constraint::Length(1), Constraint::Min(1), Constraint::Length(3)].as_ref()
             } else {
                 [Constraint::Min(1), Constraint::Length(3)].as_ref()
             };
@@ -94,10 +105,13 @@ pub fn draw(f: &mut Frame, app: &App) {
                 .constraints(constraints)
                 .split(size);
 
-            draw_table(f, app, chunks[0]);
-            draw_status(f, app, chunks[1]);
             if app.config.ui.time_bar.show {
-                draw_time_bar(f, app, chunks[2]);
+                draw_time_bar(f, app, chunks[0]);
+                draw_table(f, app, chunks[1]);
+                draw_status(f, app, chunks[2]);
+            } else {
+                draw_table(f, app, chunks[0]);
+                draw_status(f, app, chunks[1]);
             }
         }
     }
