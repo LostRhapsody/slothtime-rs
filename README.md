@@ -45,11 +45,12 @@ Type "?" to see a list of shortcuts and instructions.
 
 A few quality of life improvements.
 
-- [] All text fields: Enhance the appeal of typing. Improve the cursor, include undo/redo operations, more vim motions.
-- [] Time entry text field: Enhance the behavior, currently can't scroll past the default size, so you can type as much as you want, but can't see it after 50 lines or so. Need's to have overflow behavior.
-- [] Save/Export notification: Add a message to the status bar when saving/export.
-- [] Auto save: When turned on, after exiting edit mode, automatically export the file.
-- [] Themes: add some color
+- [ ] All text fields: Enhance the appeal of typing. Improve the cursor, include undo/redo operations, more vim motions.
+- [ ] Time entry text field: Enhance the behavior, currently can't scroll past the default size, so you can type as much as you want, but can't see it after 50 lines or so. Need's to have overflow behavior.
+- [ ] Save/Export notification: Add a message to the status bar when saving/export.
+- [ ] Auto save: When turned on, after exiting edit mode, automatically export the file.
+- [ ] Themes: add some color
+- [ ] Update help: Currently shows some out of date information
 
 ### Configuration
 
