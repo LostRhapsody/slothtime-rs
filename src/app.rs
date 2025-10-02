@@ -4,6 +4,7 @@ use crossterm::event::{self, KeyEventKind};
 use ratatui::backend::CrosstermBackend;
 use ratatui::Terminal;
 use std::io;
+use std::time::{Duration, Instant};
 
 use crate::config::Config;
 use crate::time_entry::TimeEntry;
@@ -45,6 +46,8 @@ pub struct App {
     pub pending_delete: bool, // Track if first 'd' was pressed for 'dd' command
     pub status_message: Option<String>, // Temporary status message
     pub message_timer: Option<std::time::Instant>, // Timer for status message
+    pub last_save_time: Instant, // Track when we last saved
+    pub auto_save_interval: Duration, // How often to auto-save
 }
 
 impl App {
@@ -62,6 +65,8 @@ impl App {
             pending_delete: false,
             status_message: None,
             message_timer: None,
+            last_save_time: Instant::now(),
+            auto_save_interval: Duration::from_secs(30), // Auto-save every 30 seconds
         };
         // Initialize mode based on starting column
         app.update_mode_for_column();
@@ -90,13 +95,56 @@ impl App {
             fs::create_dir_all(&config_dir).unwrap();
         }
         let file = config_dir.join("entries.json");
-        fs::write(file, content)?;
+        
+        // Create backup before saving
+        self.create_backup(&config_dir)?;
+        
+        // Save the main file
+        fs::write(&file, content)?;
+        Ok(())
+    }
+
+    fn create_backup(&self, config_dir: &std::path::Path) -> Result<()> {
+        let content = serde_json::to_string(&self.entries)?;
+        let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S");
+        let backup_file = config_dir.join(format!("entries_backup_{}.json", timestamp));
+        fs::write(backup_file, content)?;
+        
+        // Keep only the last 10 backups to avoid disk space issues
+        self.cleanup_old_backups(config_dir)?;
+        
+        Ok(())
+    }
+
+    fn cleanup_old_backups(&self, config_dir: &std::path::Path) -> Result<()> {
+        let mut backup_files: Vec<_> = fs::read_dir(config_dir)?
+            .filter_map(|entry| entry.ok())
+            .filter(|entry| {
+                entry.path().file_name()
+                    .and_then(|name| name.to_str())
+                    .map(|name| name.starts_with("entries_backup_") && name.ends_with(".json"))
+                    .unwrap_or(false)
+            })
+            .collect();
+
+        // Sort by modification time (newest first)
+        backup_files.sort_by(|a, b| {
+            b.metadata().unwrap().modified().unwrap()
+                .cmp(&a.metadata().unwrap().modified().unwrap())
+        });
+
+        // Keep only the 10 most recent backups
+        for backup in backup_files.iter().skip(10) {
+            let _ = fs::remove_file(&backup.path());
+        }
+
         Ok(())
     }
 
     pub fn run(&mut self, terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> Result<()> {
         loop {
             self.update_message_timer();
+            self.check_auto_save();
             terminal.draw(|f| ui::draw(f, self))?;
             if self.should_quit {
                 self.save_entries().ok();
@@ -509,6 +557,8 @@ impl App {
         {
             self.entries.push(TimeEntry::new());
         }
+        // Save when exiting edit mode
+        self.auto_save();
     }
 
     fn insert_char(&mut self, c: char) {
@@ -529,6 +579,8 @@ impl App {
         if self.text_cursor <= field.len() {
             field.insert(self.text_cursor, c);
             self.text_cursor += 1;
+            // Auto-save after each character insertion
+            self.auto_save();
         }
     }
 
@@ -550,6 +602,8 @@ impl App {
         if self.text_cursor > 0 && self.text_cursor <= field.len() {
             field.remove(self.text_cursor - 1);
             self.text_cursor -= 1;
+            // Auto-save after each character deletion
+            self.auto_save();
         }
     }
 
@@ -596,6 +650,24 @@ impl App {
                 self.status_message = None;
                 self.message_timer = None;
             }
+        }
+    }
+
+    fn check_auto_save(&mut self) {
+        if self.last_save_time.elapsed() >= self.auto_save_interval {
+            if let Err(e) = self.save_entries() {
+                self.show_message(&format!("Auto-save failed: {}", e));
+            } else {
+                self.last_save_time = Instant::now();
+            }
+        }
+    }
+
+    fn auto_save(&mut self) {
+        if let Err(e) = self.save_entries() {
+            self.show_message(&format!("Save failed: {}", e));
+        } else {
+            self.last_save_time = Instant::now();
         }
     }
 
