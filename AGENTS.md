@@ -1,5 +1,7 @@
 # Agent Guidelines for slothtime-rs
 
+Refer to README.md for what this app does and is for.
+
 ## Build/Test Commands
 - **Build**: `cargo build` (debug) or `cargo build --release` (optimized)
 - **Run**: `cargo run` or `./target/debug/slothtime-rs`
